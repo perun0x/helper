@@ -1,0 +1,40 @@
+version: "3.9"
+
+x-common: &common
+  TRANSPORT: nats://transport:4222
+  REDIS_HOST: valkey
+  REDIS_PORT: 6379
+  REDIS_USERNAME: default
+  REDIS_PASSWORD: ""
+
+services:
+  client:
+    image: registry.example.com/client:latest 
+    environment:
+      <<: *common
+    deploy:
+      labels:
+        - "traefik.swarm.network=public"
+        - "traefik.enable=true"
+        - "traefik.http.routers.client.entrypoints=web"
+        - "traefik.http.routers.client.rule=Host(`${BASE_URL}`) && !PathPrefix(`/api`)"
+        - "traefik.http.routers.client.service=client"
+        - "traefik.http.services.client.loadbalancer.server.port=80"
+        - "traefik.http.routers.client.middlewares=security-headers"
+        - "traefik.http.middlewares.security-headers.headers.frameDeny=false"
+        - "traefik.http.middlewares.security-headers.headers.customFrameOptionsValue=SAMEORIGIN"
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 15s
+
+    networks:
+      - public
+
+networks:
+  public:
+    driver: overlay
+    attachable: true
+    name: public

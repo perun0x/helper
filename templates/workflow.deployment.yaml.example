@@ -1,0 +1,36 @@
+name: Build And Deploy To Swarm
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "Deployment environment"
+        required: true
+        default: "dev"
+        type: choice
+        options: ["dev", "qa", "prod"]
+
+jobs:
+
+  deploy-stack:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+
+        - name: Prepare SSH key
+          env:
+            SSH_KEY: ${{ secrets.SSH_KEY }}
+          run: scripts/prepare_ssh_key.sh
+
+        - name: Convert stage to uppercase
+          run: echo "STAGE_UPPER=$(echo ${{ inputs.stage || 'dev' }} | tr '[:lower:]' '[:upper:]')" >> $GITHUB_ENV
+
+        - name: Deploy stack file to the swarm
+          env:
+            BASE_URL: ${{ secrets[format('BASE_URL_{0}', env.STAGE_UPPER)] }}
+
+          run: |
+            STAGE=${{ inputs.stage || 'dev' }}
+            echo "Using STAGE: $STAGE"
+            python3 deployment/helper/main.py --placeholder_file_path "deployment/$STAGE.yml" --remote_address "123.123.123.123"  --stage "$STAGE"
